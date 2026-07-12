@@ -1,0 +1,87 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "hwp-rag-mcp"
+version = "0.1.1"
+description = "Local HWP/HWPX retrieval for Codex and Claude Code over MCP"
+readme = "README.md"
+requires-python = ">=3.10,<3.14"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+  { name = "HWP RAG MCP Contributors" },
+]
+keywords = ["hwp", "hwpx", "rag", "mcp", "faiss", "langchain", "korean"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Text Processing :: Indexing",
+]
+dependencies = [
+  "faiss-cpu>=1.12,<2",
+  "langchain-community>=0.4,<1",
+  "langchain-huggingface>=1,<2",
+  "langchain-hwp-hwpx-loader>=0.1.1,<0.2",
+  "langchain-text-splitters>=1,<2",
+  "mcp>=1.20,<2",
+  "platformdirs>=4,<5",
+  "sentence-transformers>=5,<6",
+]
+
+[project.optional-dependencies]
+dev = [
+  "build>=1.2",
+  "mypy>=1.11",
+  "pytest>=8",
+  "pytest-asyncio>=0.24",
+  "ruff>=0.7",
+  "twine>=5",
+]
+
+[project.scripts]
+hwp-rag-mcp = "hwp_rag_mcp.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/jaypakdevkr/kb-mcp-server"
+Repository = "https://github.com/jaypakdevkr/kb-mcp-server"
+Issues = "https://github.com/jaypakdevkr/kb-mcp-server/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/hwp_rag_mcp"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "/src",
+  "/tests",
+  "/README.md",
+  "/LICENSE",
+  "/CHANGELOG.md",
+  "/pyproject.toml",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+packages = ["hwp_rag_mcp"]
+warn_unused_ignores = false

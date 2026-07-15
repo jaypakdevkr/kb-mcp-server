@@ -21,6 +21,22 @@ jobs:
           name: dist
           path: dist/
 
+  release-auth:
+    runs-on: ubuntu-latest
+    outputs:
+      token_available: ${{ steps.detect.outputs.token_available }}
+    steps:
+      - name: Detect the optional PyPI API token
+        id: detect
+        env:
+          PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          if [[ -n "$PYPI_API_TOKEN" ]]; then
+            echo "token_available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "token_available=false" >> "$GITHUB_OUTPUT"
+          fi
+
   model-smoke:
     needs: build
     runs-on: ubuntu-latest
@@ -49,7 +65,8 @@ jobs:
           PY
 
   testpypi:
-    needs: [build, model-smoke]
+    if: needs.release-auth.outputs.token_available != 'true'
+    needs: [build, model-smoke, release-auth]
     runs-on: ubuntu-latest
     environment: testpypi
     permissions:
@@ -65,7 +82,8 @@ jobs:
           skip-existing: true
 
   testpypi-smoke:
-    needs: testpypi
+    if: needs.release-auth.outputs.token_available != 'true'
+    needs: [testpypi, release-auth]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -93,8 +111,15 @@ jobs:
             --dry-run
 
   pypi:
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: testpypi-smoke
+    if: >-
+      always() &&
+      startsWith(github.ref, 'refs/tags/v') &&
+      needs.build.result == 'success' &&
+      needs.model-smoke.result == 'success' &&
+      needs.release-auth.result == 'success' &&
+      (needs.release-auth.outputs.token_available == 'true' ||
+      needs.testpypi-smoke.result == 'success')
+    needs: [build, model-smoke, release-auth, testpypi-smoke]
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
@@ -104,4 +129,11 @@ jobs:
         with:
           name: dist
           path: dist/
-      - uses: pypa/gh-action-pypi-publish@release/v1
+      - name: Publish with the configured API token
+        if: needs.release-auth.outputs.token_available == 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+      - name: Publish with PyPI Trusted Publishing
+        if: needs.release-auth.outputs.token_available != 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1

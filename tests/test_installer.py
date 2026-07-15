@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 
@@ -86,7 +87,7 @@ def test_setup_detects_identical_codex_configuration(monkeypatch, tmp_path: Path
         "\n".join(
             [
                 "[mcp_servers.hwp-rag]",
-                f'command = "{uvx}"',
+                f"command = {json.dumps(uvx)}",
                 "args = [\"--python\", \"3.12\", \"--from\", "
                 "\"hwp-rag-mcp==0.2.0\", \"hwp-rag-mcp\", \"serve\"]",
             ]
@@ -232,16 +233,25 @@ def test_claude_custom_config_directory_is_respected(monkeypatch, tmp_path: Path
     uvx = str((tmp_path / "bin" / "uvx").resolve())
     custom_config.mkdir()
     (custom_config / ".claude.json").write_text(
-        "{\n"
-        '  "mcpServers": {\n'
-        '    "hwp-rag": {\n'
-        '      "type": "stdio",\n'
-        f'      "command": "{uvx}",\n'
-        '      "args": ["--python", "3.12", "--from", '
-        '"hwp-rag-mcp==0.2.0", "hwp-rag-mcp", "serve"]\n'
-        "    }\n"
-        "  }\n"
-        "}\n",
+        json.dumps(
+            {
+                "mcpServers": {
+                    "hwp-rag": {
+                        "type": "stdio",
+                        "command": uvx,
+                        "args": [
+                            "--python",
+                            "3.12",
+                            "--from",
+                            "hwp-rag-mcp==0.2.0",
+                            "hwp-rag-mcp",
+                            "serve",
+                        ],
+                    }
+                }
+            },
+            indent=2,
+        ),
         encoding="utf-8",
     )
     calls: list[list[str]] = []

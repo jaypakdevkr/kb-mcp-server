@@ -21,6 +21,7 @@ jobs:
       - run: python -m pip install --upgrade pip
       - run: python -m pip install -e '.[dev]'
       - run: ruff check .
+      - run: mypy src/hwp_rag_mcp
       - run: pytest
 
   desktop-platforms:
@@ -50,4 +51,3 @@ jobs:
       - run: python -m pip install build twine
       - run: python -m build
       - run: twine check dist/*
-

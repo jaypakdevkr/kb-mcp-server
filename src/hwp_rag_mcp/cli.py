@@ -8,7 +8,6 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from . import __version__
-from .index import IndexManager
 
 
 def _add_dataset_argument(parser: argparse.ArgumentParser) -> None:
@@ -37,6 +36,23 @@ def build_parser() -> argparse.ArgumentParser:
 
     serve_parser = subparsers.add_parser("serve", help="Run the MCP STDIO server")
     _add_dataset_argument(serve_parser)
+
+    setup_parser = subparsers.add_parser(
+        "setup", help="Register the MCP server with Codex or Claude Code"
+    )
+    setup_parser.add_argument("--client", choices=("codex", "claude"), required=True)
+    _add_dataset_argument(setup_parser)
+    setup_parser.add_argument(
+        "--no-sync", action="store_true", help="Register without building the first index"
+    )
+    setup_parser.add_argument(
+        "--replace-existing",
+        action="store_true",
+        help="Replace a conflicting hwp-rag host entry after explicit approval",
+    )
+    setup_parser.add_argument(
+        "--dry-run", action="store_true", help="Report planned setup actions without changes"
+    )
     return parser
 
 
@@ -50,18 +66,32 @@ def main(argv: Sequence[str] | None = None) -> int:
         run_server(args.dataset_dir)
         return 0
 
+    if args.command == "setup":
+        from .installer import run_setup
+
+        setup_report = run_setup(
+            args.client,
+            dataset_dir=args.dataset_dir,
+            no_sync=args.no_sync,
+            replace_existing=args.replace_existing,
+            dry_run=args.dry_run,
+        )
+        print(setup_report.model_dump_json(indent=2))
+        return 0 if setup_report.ok else 1
+
     try:
+        from .index import IndexManager
+
         manager = IndexManager(args.dataset_dir)
         if args.command == "status":
             print(manager.status().model_dump_json(indent=2))
             return 0
         if args.command == "sync":
-            report = manager.sync(force=args.force)
-            print(report.model_dump_json(indent=2))
-            return 0 if report.state == "current" else 1
+            sync_report = manager.sync(force=args.force)
+            print(sync_report.model_dump_json(indent=2))
+            return 0 if sync_report.state == "current" else 1
     except Exception as exc:
         print(f"{exc.__class__.__name__}: {exc}", file=sys.stderr)
         return 1
     parser.error(f"Unsupported command: {args.command}")
     return 2
-

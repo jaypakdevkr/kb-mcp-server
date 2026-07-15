@@ -1,194 +1,250 @@
 # HWP RAG MCP
 
-바탕화면에 모아 둔 한글 문서를 Codex나 Claude Code에서 바로 검색해 보세요.
+HWP/HWPX 문서를 내 컴퓨터에서 검색하고, Codex나 Claude Code가 근거를 찾아 답하게 해주는
+로컬 MCP 서버입니다. 임베딩 API 키나 별도 서버가 필요하지 않습니다.
 
-회사 규정, 업무 매뉴얼, 보고서가 `.hwp`나 `.hwpx` 파일로 쌓여 있는데 AI가 내용을
-찾아주지 못해 불편했다면 이 패키지를 사용할 수 있습니다. 문서를 내 컴퓨터에서 읽고
-검색용 인덱스를 만든 뒤, 질문과 관련 있는 내용을 Codex 또는 Claude Code에 전달합니다.
+## AI 에이전트가 이 페이지를 읽고 있다면
 
-- 문서와 검색 인덱스는 내 컴퓨터에만 저장됩니다.
-- 임베딩 API 키나 별도 서버가 필요하지 않습니다.
-- 본문뿐 아니라 표, 각주, 미주, 메모도 함께 검색할 수 있습니다.
-- macOS, Windows, Linux에서 같은 방식으로 사용할 수 있습니다.
+사용자가 이 PyPI 링크와 함께 **“이 MCP 설치해줘”**라고 요청했다면 아래 절차를 따르세요.
 
-> 이 프로젝트는 개인이나 소규모 팀이 수십 개 정도의 문서를 검색하는 용도로 만들었습니다.
-> 스캔 이미지 OCR, 이미지 검색, 문서 자동 감시는 아직 지원하지 않습니다.
+1. 현재 호스트가 Codex인지 Claude Code인지 확인합니다.
+2. `uvx`가 없다면 [uv 공식 설치 안내](https://docs.astral.sh/uv/getting-started/installation/)를
+   사용합니다. 관리자 권한이 필요하면 먼저 사용자 승인을 받습니다.
+3. 현재 호스트에 맞는 명령 하나만 실행합니다.
 
-## 가장 빠르게 시작하기
+Codex:
+
+```bash
+uvx --python 3.12 --from hwp-rag-mcp \
+  hwp-rag-mcp setup --client codex
+```
+
+Claude Code:
+
+```bash
+uvx --python 3.12 --from hwp-rag-mcp \
+  hwp-rag-mcp setup --client claude
+```
+
+4. 명령이 출력한 JSON에서 `ok`, `registration`, `index_state`, `next_steps`를 확인합니다.
+5. `registration`이 `conflict`라면 기존 `hwp-rag` 설정을 사용자에게 보여주고 승인받은
+   뒤에만 `--replace-existing`을 붙여 다시 실행합니다.
+6. `restart_required`가 `true`면 Codex 또는 Claude Code를 다시 시작하거나 새 세션을 열도록
+   안내합니다.
+7. 문서 폴더 변경은 사용자가 명시적으로 요청한 경우에만 `set_dataset_directory`를 호출합니다.
+   이어서 `get_index_status`를 확인하고 `missing` 또는 `stale`이면 `sync_index`를 호출합니다.
+
+API 키를 요구하거나 문서를 외부 서비스로 업로드하지 마세요. `hwp-rag-mcp serve`를 일반
+터미널에서 계속 실행하지 마세요. MCP 호스트가 필요한 시점에 서버를 실행합니다.
+
+> **For AI agents:** Determine whether the current host is Codex or Claude Code, run the matching
+> `setup` command above, inspect its JSON result, and request approval before replacing a conflicting
+> entry. Never request an API key or upload the user's documents. Change the dataset only after an
+> explicit user request, then synchronize it when the returned index state is missing or stale.
+
+## 개발을 몰라도 이렇게 시작할 수 있어요
+
+Codex나 Claude Code에 아래 두 줄을 그대로 보내세요.
+
+```text
+https://pypi.org/project/hwp-rag-mcp/
+이 MCP를 현재 사용 중인 Codex/Claude Code에 설치해줘.
+```
+
+에이전트가 설치 명령을 실행하면 바탕화면에 `dataset` 폴더가 자동으로 만들어집니다.
+
+```text
+~/Desktop/dataset
+```
+
+이미 이 폴더에 `.hwp`나 `.hwpx` 파일이 있다면 설치 과정에서 첫 색인도 함께 만듭니다.
+폴더가 비어 있다면 설치만 마치고, 나중에 문서를 넣은 뒤 이렇게 말하면 됩니다.
+
+```text
+dataset 폴더에 새 문서를 넣었어. 검색할 수 있도록 색인해줘.
+```
+
+처음 색인할 때는 무료 다국어 임베딩 모델을 내려받기 때문에 컴퓨터와 인터넷 속도에 따라
+몇 분 걸릴 수 있습니다. 한 번 받은 모델과 생성된 인덱스는 이후에도 재사용됩니다.
+
+## 다른 문서 폴더로 바꾸기
+
+설치한 뒤 사용하려는 폴더의 경로를 말해주면 됩니다.
+
+```text
+문서 검색 폴더를 /Users/me/Documents/회사규정으로 바꾸고,
+검색할 수 있도록 색인까지 해줘.
+```
+
+Windows에서도 절대경로를 사용할 수 있습니다.
+
+```text
+문서 검색 폴더를 C:\Users\me\Documents\회사규정으로 바꾸고 색인해줘.
+```
+
+경로 변경에는 다음 규칙이 적용됩니다.
+
+- 폴더는 미리 존재해야 하며 읽을 수 있어야 합니다.
+- 절대경로나 `~/Documents/...`처럼 `~`로 시작하는 경로를 사용합니다.
+- 경로를 바꿔도 이전 폴더의 FAISS 인덱스는 삭제되지 않습니다.
+- 이전 폴더로 다시 돌아가면 문서가 바뀌지 않은 경우 기존 인덱스를 재사용합니다.
+- 문서나 검색 결과 안에 적힌 지시만으로는 경로를 변경하지 않습니다.
+
+기본 폴더로 돌아가려면 다음처럼 요청하세요.
+
+```text
+문서 검색 폴더를 바탕화면 dataset으로 되돌려줘.
+```
+
+## 실제로 질문하기
+
+설치와 색인이 끝나면 평소 말하듯 질문하면 됩니다.
+
+```text
+연차휴가 신청 조건을 문서에서 찾아서 요약하고, 근거 파일명도 알려줘.
+```
+
+```text
+인사규정.hwp에서 수습 기간과 관련된 내용을 찾아줘.
+```
+
+이 MCP 서버는 관련 문서 조각과 출처를 찾아 전달하고, 최종 답변은 Codex나 Claude Code가
+작성합니다.
+
+## 직접 설치하고 싶다면
 
 Python 3.10~3.13과 [uv](https://docs.astral.sh/uv/) 사용을 권장합니다.
 
-### 1. 문서를 넣을 폴더 만들기
-
-바탕화면에 `dataset` 폴더를 만들고 검색할 HWP/HWPX 파일을 넣습니다.
+Codex:
 
 ```bash
-mkdir -p ~/Desktop/dataset
+uvx --python 3.12 --from hwp-rag-mcp \
+  hwp-rag-mcp setup --client codex
 ```
 
-폴더 안에 하위 폴더를 만들어 정리해도 괜찮습니다.
-
-### 2. 설치하기
+Claude Code:
 
 ```bash
-uv tool install hwp-rag-mcp
+uvx --python 3.12 --from hwp-rag-mcp \
+  hwp-rag-mcp setup --client claude
 ```
 
-이미 설치했다면 다음 명령으로 새 버전으로 올릴 수 있습니다.
+다른 폴더를 처음부터 사용하려면 다음처럼 지정합니다. 지정한 폴더가 없으면 `setup`이
+만듭니다.
 
 ```bash
-uv tool upgrade hwp-rag-mcp
+uvx --python 3.12 --from hwp-rag-mcp \
+  hwp-rag-mcp setup --client codex \
+  --dataset-dir ~/Documents/company-rules
 ```
 
-`uv` 대신 `pipx install hwp-rag-mcp`를 사용해도 됩니다.
-
-### 3. 처음 한 번 색인하기
+설치 계획만 확인하고 설정을 바꾸지 않으려면 `--dry-run`을 사용합니다.
 
 ```bash
-hwp-rag-mcp sync
-```
-
-처음 실행할 때는 무료 한국어 임베딩 모델을 내려받습니다. 수백 MB 정도를 다운로드하므로
-컴퓨터와 인터넷 속도에 따라 몇 분 걸릴 수 있습니다. 한 번 받아 둔 모델은 이후에도 계속
-재사용합니다.
-
-색인이 잘 만들어졌는지 확인하려면 다음 명령을 실행하세요.
-
-```bash
-hwp-rag-mcp status
-```
-
-`"state": "current"`가 보이면 검색할 준비가 끝난 것입니다.
-
-### 4. Codex에 연결하기
-
-```bash
-codex mcp add hwp-rag -- \
-  uvx --from hwp-rag-mcp hwp-rag-mcp serve
-```
-
-등록한 뒤 `codex mcp list` 또는 Codex의 `/mcp` 메뉴에서 `hwp-rag`가 연결됐는지
-확인합니다.
-
-### 5. Claude Code에 연결하기
-
-```bash
-claude mcp add hwp-rag -- \
-  uvx --from hwp-rag-mcp hwp-rag-mcp serve
-```
-
-이제 평소처럼 질문하면 됩니다.
-
-```text
-연차휴가를 신청하려면 어떤 조건이 필요한지 문서에서 찾아줘.
-근거가 나온 파일명도 함께 알려줘.
-```
-
-```text
-인사규정.hwp에서 수습 기간과 관련된 내용을 찾아서 요약해줘.
+uvx --python 3.12 --from hwp-rag-mcp \
+  hwp-rag-mcp setup --client codex --dry-run
 ```
 
 ## 문서를 추가하거나 수정했을 때
 
-파일이 바뀌었다고 해서 검색 결과가 자동으로 갱신되지는 않습니다. `dataset` 폴더에 문서를
-추가하거나 기존 문서를 수정·삭제했다면 다시 동기화해 주세요.
+문서를 추가·수정·삭제하면 인덱스가 자동으로 바뀌지는 않습니다. Codex나 Claude Code에
+“새 문서를 색인해줘”라고 요청하거나 터미널에서 다음 명령을 실행하세요.
 
 ```bash
-hwp-rag-mcp sync
+uvx --python 3.12 --from hwp-rag-mcp hwp-rag-mcp sync
 ```
 
-문서가 바뀐 상태에서 검색하면 오래된 내용을 보여주는 대신 먼저 동기화가 필요하다고
+문서가 바뀐 상태에서는 오래된 검색 결과를 반환하지 않고 먼저 동기화가 필요하다고
 안내합니다.
-
-## 다른 폴더를 사용하고 싶다면
-
-기본 폴더는 `~/Desktop/dataset`입니다. 다른 폴더를 쓰려면 명령 끝에 경로를 지정합니다.
-
-```bash
-hwp-rag-mcp sync --dataset-dir ~/Documents/company-rules
-```
-
-MCP를 등록할 때도 같은 경로를 넘겨야 합니다.
-
-```bash
-codex mcp add hwp-rag -- \
-  uvx --from hwp-rag-mcp hwp-rag-mcp serve \
-  --dataset-dir ~/Documents/company-rules
-```
-
-매번 경로를 적고 싶지 않다면 `HWP_RAG_DATASET_DIR` 환경변수를 사용할 수 있습니다.
 
 ## 내 문서는 어디에 저장되나요?
 
-- 원본 HWP/HWPX 파일은 사용자가 만든 `dataset` 폴더에서 이동하지 않습니다.
-- 검색용 FAISS 인덱스는 운영체제의 사용자 데이터 폴더에 저장됩니다.
-- 문서 본문이나 검색어를 외부 임베딩 API로 보내지 않습니다.
-- 인터넷은 최초 임베딩 모델 다운로드와 패키지 설치에만 필요합니다.
+- 원본 파일은 사용자가 선택한 폴더에서 이동하지 않습니다.
+- 활성 데이터셋 경로만 운영체제의 사용자 설정 폴더에 JSON으로 저장합니다.
+- FAISS 인덱스는 데이터셋 절대경로별로 사용자 데이터 폴더에 저장합니다.
+- 문서 본문이나 질문을 외부 임베딩 API로 보내지 않습니다.
+- 인터넷은 패키지 설치와 최초 임베딩 모델 다운로드에만 필요합니다.
 - API 키를 입력하거나 텍스트 파일에 저장하는 기능은 없습니다.
 
 인덱스는 `index.faiss`, `documents.json`, `manifest.json`으로 저장합니다. Python pickle을
-사용하지 않으며, 파일이 손상되거나 바뀌었는지 SHA-256으로 확인합니다.
+사용하지 않으며 SHA-256으로 문서와 저장 파일의 변경 여부를 확인합니다.
 
-## 지원하는 문서와 제한 사항
+## 지원 범위
 
 지원하는 기능:
 
 - `.hwp`, `.hwpx` 파일과 하위 폴더 검색
 - 본문, 표, 각주, 미주, 메모, 하이퍼링크 추출
 - 한국어를 포함한 다국어 의미 검색
-- 문서별 파일명과 원본 경로를 검색 결과에 포함
+- 검색 결과에 파일명과 원본 경로 포함
+- 여러 데이터셋 경로의 인덱스를 따로 보관하고 전환
 
 현재 지원하지 않는 기능:
 
 - 암호가 걸린 문서 복호화
-- 스캔 문서 OCR
-- 문서 안의 이미지 내용 검색
+- 스캔 문서 OCR과 이미지 내용 검색
 - 문서 변경 자동 감시
+- MCP 도구를 통한 새 폴더 생성
 - 수천~수만 개 문서를 위한 분산 검색
 
-암호화되거나 손상된 문서는 건너뛰고, 나머지 정상 문서는 계속 색인합니다.
+암호화되거나 손상된 문서는 건너뛰고 나머지 정상 문서는 계속 색인합니다.
 
-## 자주 쓰는 명령
+## 제공하는 명령과 MCP 도구
 
-| 명령 | 언제 사용하나요? |
+자주 쓰는 명령:
+
+| 명령 | 하는 일 |
 | --- | --- |
-| `hwp-rag-mcp status` | 현재 인덱스를 바로 검색할 수 있는지 확인할 때 |
-| `hwp-rag-mcp sync` | 문서를 처음 넣었거나 파일이 바뀌었을 때 |
-| `hwp-rag-mcp sync --force` | 변경이 없어도 인덱스를 처음부터 다시 만들 때 |
-| `hwp-rag-mcp serve` | MCP 클라이언트가 로컬 서버를 실행할 때 |
+| `hwp-rag-mcp setup --client codex` | Codex에 설치하고 최초 색인을 준비합니다. |
+| `hwp-rag-mcp setup --client claude` | Claude Code 사용자 설정에 설치합니다. |
+| `hwp-rag-mcp status` | 현재 활성 데이터셋의 인덱스 상태를 확인합니다. |
+| `hwp-rag-mcp sync` | 현재 활성 데이터셋의 인덱스를 다시 만듭니다. |
+| `hwp-rag-mcp sync --force` | 변경이 없어도 인덱스를 처음부터 다시 만듭니다. |
+| `hwp-rag-mcp serve` | MCP 호스트가 STDIO 서버를 실행할 때 사용합니다. |
 
-## 제공하는 MCP 도구
+제공하는 MCP 도구:
 
 | 도구 | 하는 일 |
 | --- | --- |
+| `get_dataset_directory` | 활성 데이터셋 경로와 변경 가능 여부를 확인합니다. |
+| `set_dataset_directory` | 사용자가 지정한 기존 폴더를 활성 데이터셋으로 저장합니다. |
+| `reset_dataset_directory` | 저장된 경로를 지우고 바탕화면 `dataset`으로 돌아갑니다. |
 | `get_index_status` | 인덱스가 없음, 사용 가능, 갱신 필요 중 어느 상태인지 확인합니다. |
-| `sync_index` | HWP/HWPX 파일을 다시 읽어 검색 인덱스를 만듭니다. |
+| `sync_index` | 현재 폴더의 HWP/HWPX를 읽어 검색 인덱스를 만듭니다. |
 | `list_documents` | 현재 인덱스에 들어 있는 문서 목록을 보여줍니다. |
-| `search_documents` | 질문과 관련 있는 문서 내용을 찾아 파일 정보와 함께 반환합니다. |
-
-검색 결과를 바탕으로 실제 답변을 작성하는 일은 Codex나 Claude Code가 담당합니다. 이 MCP
-서버가 별도의 유료 LLM API를 호출하지는 않습니다.
+| `search_documents` | 질문과 관련 있는 내용을 파일 정보와 함께 반환합니다. |
 
 ## 문제가 생겼을 때
 
-### `index_missing`이 표시됩니다
+### `uvx was not found`가 표시됩니다
 
-`~/Desktop/dataset` 폴더가 있는지, 그 안에 `.hwp` 또는 `.hwpx` 파일이 있는지 확인한 뒤
-`hwp-rag-mcp sync`를 실행하세요.
+[uv 공식 설치 안내](https://docs.astral.sh/uv/getting-started/installation/)에 따라 uv를 설치한
+뒤 같은 `setup` 명령을 다시 실행하세요.
 
-### `index_stale`이 표시됩니다
+### `registration: "conflict"`가 표시됩니다
 
-문서가 추가·수정·삭제된 상태입니다. `hwp-rag-mcp sync`를 한 번 더 실행하세요.
+같은 이름의 MCP 설정이 이미 있지만 실행 명령이 다릅니다. 기존 설정을 확인한 뒤 교체해도
+된다면 다음처럼 실행합니다.
 
-### 첫 동기화가 너무 오래 걸립니다
+```bash
+uvx --python 3.12 --from hwp-rag-mcp \
+  hwp-rag-mcp setup --client codex --replace-existing
+```
 
-처음에는 임베딩 모델을 내려받고 문서를 모두 읽어야 해서 시간이 걸립니다. MCP 도구에서
-시간 초과가 난다면 터미널에서 `hwp-rag-mcp sync`를 먼저 마친 뒤 다시 검색하세요.
+### `dataset_locked`가 표시됩니다
 
-### 특정 문서만 검색되지 않습니다
+MCP 서버가 `--dataset-dir` 인자나 `HWP_RAG_DATASET_DIR` 환경변수로 실행되고 있습니다.
+해당 고정 설정을 제거하고 호스트를 다시 시작해야 MCP 도구로 경로를 변경할 수 있습니다.
 
-암호화됐거나 손상된 문서일 수 있습니다. `sync` 결과의 `skipped_files`와 `failed_files`를
-확인하세요.
+### `index_missing` 또는 `index_stale`이 표시됩니다
+
+현재 폴더에 HWP/HWPX가 있는지 확인하고 “이 폴더를 색인해줘”라고 요청하세요. 직접 실행할
+때는 `hwp-rag-mcp sync`를 사용합니다.
+
+### 첫 색인이 너무 오래 걸립니다
+
+처음에는 임베딩 모델을 내려받고 문서를 모두 읽어야 해서 시간이 걸립니다. MCP 호출이 시간
+초과되면 터미널에서 `hwp-rag-mcp sync`를 먼저 완료한 뒤 다시 검색하세요.
 
 ## 개발하기
 
@@ -203,20 +259,9 @@ python -m build
 twine check dist/*
 ```
 
-## 사용 기술
-
-- HWP/HWPX 파싱: `langchain-hwp-hwpx-loader`
-- 문서 분할: `RecursiveCharacterTextSplitter`
-- 로컬 임베딩: `intfloat/multilingual-e5-small`
-- 벡터 검색: FAISS `IndexFlatIP`
-- MCP 서버: 공식 Python MCP SDK의 FastMCP
+주요 기술은 `langchain-hwp-hwpx-loader`, `RecursiveCharacterTextSplitter`,
+`intfloat/multilingual-e5-small`, FAISS `IndexFlatIP`, 공식 Python MCP SDK의 FastMCP입니다.
 
 ## 라이선스
 
 MIT License
-
-## English summary
-
-HWP RAG MCP indexes local Korean HWP/HWPX documents with a free multilingual embedding model and
-exposes evidence search to Codex and Claude Code over MCP. Documents and indexes remain on the
-user's computer, and no embedding API key is required.

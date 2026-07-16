@@ -12,7 +12,7 @@ os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 try:
     __version__ = version("hwp-rag-mcp")
 except PackageNotFoundError:  # pragma: no cover - source tree without installation
-    __version__ = "0.2.0"
+    __version__ = "0.2.1"
 
 if TYPE_CHECKING:
     from .index import IndexManager

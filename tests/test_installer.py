@@ -4,6 +4,7 @@ import json
 import subprocess
 from pathlib import Path
 
+from hwp_rag_mcp import __version__
 from hwp_rag_mcp.config import DatasetSettings
 from hwp_rag_mcp.index import IndexManager
 from hwp_rag_mcp.installer import run_setup
@@ -47,7 +48,7 @@ def test_setup_dry_run_has_no_side_effects(monkeypatch, tmp_path: Path) -> None:
     assert not settings.path.exists()
     assert calls == []
     assert report.registration_command[-2:] == ["hwp-rag-mcp", "serve"]
-    assert "hwp-rag-mcp==0.2.0" in report.registration_command
+    assert f"hwp-rag-mcp=={__version__}" in report.registration_command
 
 
 def test_setup_registers_claude_at_user_scope(monkeypatch, tmp_path: Path) -> None:
@@ -89,7 +90,7 @@ def test_setup_detects_identical_codex_configuration(monkeypatch, tmp_path: Path
                 "[mcp_servers.hwp-rag]",
                 f"command = {json.dumps(uvx)}",
                 "args = [\"--python\", \"3.12\", \"--from\", "
-                "\"hwp-rag-mcp==0.2.0\", \"hwp-rag-mcp\", \"serve\"]",
+                f"\"hwp-rag-mcp=={__version__}\", \"hwp-rag-mcp\", \"serve\"]",
             ]
         ),
         encoding="utf-8",
@@ -243,7 +244,7 @@ def test_claude_custom_config_directory_is_respected(monkeypatch, tmp_path: Path
                             "--python",
                             "3.12",
                             "--from",
-                            "hwp-rag-mcp==0.2.0",
+                            f"hwp-rag-mcp=={__version__}",
                             "hwp-rag-mcp",
                             "serve",
                         ],

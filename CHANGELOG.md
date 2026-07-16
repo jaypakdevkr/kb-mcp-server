@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.1] - 2026-07-16
+
+### Changed
+
+- Refined the Korean PyPI README with clearer first-use, agent-installation, dataset-switching, and indexing guidance.
+
 ## [0.2.0] - 2026-07-15
 
 ### Added
